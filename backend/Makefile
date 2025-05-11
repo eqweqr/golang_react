@@ -1,0 +1,2 @@
+docker run --name postgres_kurs -p 5432:5432 --rm -d -e POSTGRES_USER=mkyong -ePOSTGRES_PASSWORD=password  -ePOSTGRES_DB=kurs -v ./db/init.sql:/docker-entrypoint-initdb.d/init.sql postgres
+docker exec -it postgres_kurs psql -U mkyong -d kurs
