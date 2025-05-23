@@ -53,3 +53,12 @@ func GetRoles(token *jwt.Token) string {
 	}
 	return ""
 }
+
+func GetId(token *jwt.Token) string {
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if id, ok := claims["id"].(string); ok {
+			return id
+		}
+	}
+	return ""
+}

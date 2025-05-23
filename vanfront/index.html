@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Управление заказами</title>
+    <style>
+        /* Стили аналогичные React-версии */
+        .orders-page {
+            max-width: 1400px;
+            margin: 40px auto;
+            padding: 32px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 75, 145, 0.1);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .section-header {
+            cursor: pointer;
+            padding: 16px;
+            background: #f0f6ff;
+            margin: 10px 0;
+        }
+        
+        .order-card {
+            border: 1px solid #e3efff;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        
+        /* Добавьте остальные стили из React-версии */
+    </style>
+</head>
+<body>
+    <div class="orders-page">
+        <header class="orders-header">
+            <h1>Управление заказами</h1>
+            <p>Просмотр и отслеживание текущих и выполненных заказов</p>
+        </header>
+
+        <div class="add-section">
+            <button id="toggleFormBtn">+ Добавить Заказ</button>
+            
+            <form id="addOrderForm" style="display: none;">
+                <div class="form-row">
+                    <input type="text" id="modelName" placeholder="Название модели" required>
+                    
+                    <select id="selectedRepairman">
+                        <option value="Любой">Любой</option>
+                    </select>
+
+                    <select id="deviceType" required></select>
+
+                    <label>
+                        <input type="checkbox" id="isWarranty">
+                        Гарантийный ремонт
+                    </label>
+                </div>
+
+                <textarea id="comment" placeholder="Дополнительная информация"></textarea>
+                
+                <button type="submit">Создать заказ</button>
+            </form>
+        </div>
+
+        <section class="orders-section">
+            <div class="section-header" data-section="pending">
+                <h2>Заказы без исполнителя (<span id="pendingCount">0</span>)</h2>
+                <span>−</span>
+            </div>
+            <div id="pendingOrders" class="orders-list"></div>
+        </section>
+
+        <section class="orders-section">
+            <div class="section-header" data-section="processing">
+                <h2>Выполняемые заказы (<span id="processingCount">0</span>)</h2>
+                <span>−</span>
+            </div>
+            <div id="processingOrders" class="orders-list"></div>
+        </section>
+
+        <section class="orders-section">
+            <div class="section-header" data-section="done">
+                <h2>Выполненные (<span id="doneCount">0</span>)</h2>
+                <span>−</span>
+            </div>
+            <div id="doneOrders" class="orders-list"></div>
+        </section>
+    </div>
+
+    <script>
+        const state = {
+            workers: [],
+            techTypes: [],
+            orders: {
+                pending: [],
+                processing: [],
+                done: []
+            },
+            expandedSections: {
+                pending: true,
+                processing: true,
+                done: true
+            },
+            selectedOrder: null
+        };
+
+        // Загрузка данных при старте
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadWorkers();
+            await loadTechTypes();
+            await loadAllOrders();
+            setupEventListeners();
+            renderAll();
+        });
+
+        async function loadWorkers() {
+            try {
+                const response = await fetch('http://localhost:8081/api/workers');
+                const data = await response.json();
+                state.workers = data.map(w => ({ id: w.Id, name: w.Name }));
+                renderSelectOptions('selectedRepairman', state.workers);
+            } catch (error) {
+                console.error('Ошибка загрузки работников:', error);
+            }
+        }
+
+        async function loadTechTypes() {
+            try {
+                const response = await fetch('http://localhost:8081/api/work/types');
+                const data = await response.json();
+                state.techTypes = data.map(t => ({ id: t.Id, name: t.Name }));
+                renderSelectOptions('deviceType', state.techTypes);
+            } catch (error) {
+                console.error('Ошибка загрузки типов техники:', error);
+            }
+        }
+
+        async function loadAllOrders() {
+            await loadOrders('pending');
+            await loadOrders('processing');
+            await loadOrders('done');
+        }
+
+        async function loadOrders(status) {
+            try {
+                const response = await fetch(
+                    `http://localhost:8081/api/orders?id=2&status=${status}`
+                );
+                const data = await response.json();
+                state.orders[status] = data.map(o => transformOrder(o));
+                renderOrders(status);
+            } catch (error) {
+                console.error(`Ошибка загрузки заказов (${status}):`, error);
+            }
+        }
+
+        function transformOrder(order) {
+            return {
+                id: order.OrderId,
+                modelName: order.ModelName,
+                warranty: order.Warranty,
+                comment: order.Comment,
+                status: order.OrderStatus,
+                workerName: order.WorkerName,
+                phone: order.WorkerPhone,
+                workType: order.WorkType,
+                summary: order.Summary
+            };
+        }
+
+        function renderAll() {
+            renderSectionCounts();
+            renderAddForm();
+        }
+
+        function renderSectionCounts() {
+            document.getElementById('pendingCount').textContent = state.orders.pending.length;
+            document.getElementById('processingCount').textContent = state.orders.processing.length;
+            document.getElementById('doneCount').textContent = state.orders.done.length;
+        }
+
+        function renderSelectOptions(selectId, items) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = items.map(item => 
+                `<option value="${item.id}">${item.name}</option>`
+            ).join('');
+        }
+
+        function renderOrders(status) {
+            const container = document.getElementById(`${status}Orders`);
+            const orders = state.orders[status];
+            
+            container.innerHTML = orders.map(order => `
+                <div class="order-card">
+                    <div class="order-summary" onclick="toggleOrderDetails(${order.id})">
+                        <div>№${order.id}</div>
+                        <div>${order.modelName}</div>
+                        <div>${order.workerName} (${order.phone})</div>
+                        <div>${order.summary}</div>
+                    </div>
+                    ${order.id === state.selectedOrder ? renderOrderDetails(order) : ''}
+                </div>
+            `).join('');
+        }
+
+        function toggleOrderDetails(orderId) {
+            state.selectedOrder = state.selectedOrder === orderId ? null : orderId;
+            renderAll();
+        }
+
+        function renderOrderDetails(order) {
+            return `
+                <div class="order-details">
+                    <h4>Детали заказа:</h4>
+                    <div>
+                        <strong>Тип работы:</strong> ${order.workType}<br>
+                        <strong>Статус:</strong> ${order.status}<br>
+                        <strong>Комментарий:</strong> ${order.comment}<br>
+                        <strong>Гарантия:</strong> ${order.warranty ? 'Да' : 'Нет'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function setupEventListeners() {
+            // Переключение формы
+            document.getElementById('toggleFormBtn').addEventListener('click', () => {
+                const form = document.getElementById('addOrderForm');
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            });
+
+            // Отправка формы
+            document.getElementById('addOrderForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = {
+                    modelName: document.getElementById('modelName').value,
+                    deviceType: document.getElementById('deviceType').value,
+                    comment: document.getElementById('comment').value,
+                    isWarranty: document.getElementById('isWarranty').checked,
+                    selectedRepairman: document.getElementById('selectedRepairman').value
+                };
+
+                try {
+                    const response = await fetch('http://127.0.0.1:8081/api/order/new?id=2', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+
+                    if (response.ok) {
+                        alert('Заказ успешно создан!');
+                        loadAllOrders();
+                        document.getElementById('addOrderForm').reset();
+                    }
+                } catch (error) {
+                    console.error('Ошибка создания заказа:', error);
+                }
+            });
+
+            // Переключение секций
+            document.querySelectorAll('.section-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const section = this.dataset.section;
+                    state.expandedSections[section] = !state.expandedSections[section];
+                    const content = this.nextElementSibling;
+                    content.style.display = state.expandedSections[section] ? 'block' : 'none';
+                });
+            });
+        }
+    </script>
+</body>
+</html>

@@ -5,7 +5,6 @@ import "fmt"
 type User struct {
 	ID    int
 	Name  string
-	Age   int
 	Email string
 	Phone string
 	Role  string
@@ -13,5 +12,5 @@ type User struct {
 }
 
 func (rec User) String() string {
-	return fmt.Sprintf("employee %s: %d\n", rec.Name, rec.Age)
+	return fmt.Sprintf("employee %s:\n", rec.Name)
 }

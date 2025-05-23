@@ -7,7 +7,7 @@ import (
 
 const (
 	execInsert = `INSERT INTO people(name, role, email, phone, password) values ($1, $2, $3, $4, $5) returning id`
-	queryPass  = `SELECT * from people where phone=$1`
+	queryPass  = `SELECT id, name, email, phone, role, password from people where phone=$1`
 	checkPhone = `SELECT id from people where phone=$1`
 )
 
@@ -41,7 +41,7 @@ func AddNewUser(username string, phone string, email string, pass string, secret
 
 func GetUserByPhone(phone string, db *sql.DB) (*models.User, error) {
 	var user models.User
-	err := db.QueryRow(queryPass, phone).Scan(&user)
+	err := db.QueryRow(queryPass, phone).Scan(&user.ID, &user.Name, &user.Email, &user.Phone, &user.Role, &user.Pass)
 
 	if err != nil {
 		return nil, err

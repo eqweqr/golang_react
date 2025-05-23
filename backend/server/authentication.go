@@ -85,12 +85,14 @@ func (server *Server) Register(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 
 	if len(username) < 6 || len(phone) != 11 || len(pass) < 6 || !strings.Contains(email, "@") {
+		log.Println("invalid input format")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	ok, err := controllers.CheckPhoneExists(phone, server.DB)
 	if ok || err != nil {
+		log.Println("phone number already exists")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -134,11 +136,13 @@ func (server *Server) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := controllers.GetUserByPhone(phone, server.DB)
 
 	if err != nil {
+		log.Printf("error while processing query from db with phone number: %v\n", err)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	if !password.VerifyPassword(pass, user.Pass) {
+		log.Println("Passwords not equal")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -146,6 +150,7 @@ func (server *Server) Login(w http.ResponseWriter, r *http.Request) {
 	token, err := jwttoken.CreateToken(server.Secret, user.ID, user.Name, user.Role)
 
 	if err != nil {
+		log.Println("error while creating token")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

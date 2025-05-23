@@ -24,7 +24,7 @@ func main() {
 			panic(err)
 		}
 	}
-	db, err := database.OpenDb("postgres", "postgres://mkyong:password@localhost:5432/kurs?sslmode=disable")
+	db, err := database.OpenDb("postgres", "postgres://admin:password@localhost:5432/db?sslmode=disable")
 
 	if err != nil {
 		panic(err)
@@ -38,11 +38,46 @@ func main() {
 		panic(err)
 	}
 
+	// служебные
 	http.HandleFunc("/api/token/refresh", serv.RefreshToken)
 	http.HandleFunc("/api/token/check", serv.CheckToken)
 	http.HandleFunc("/api/token/role", serv.GetRole)
+
+	// reg/login
 	http.HandleFunc("/api/user/register", serv.Register)
 	http.HandleFunc("/api/user/login", serv.Login)
+	// http.HandleFunc("/api/order/create", serv.CreateOrderHandler)
 
-	http.ListenAndServe(":8081", nil)
+	// get data about orders
+	// получить все заказы (только для админа)
+
+	// admin
+	http.Handle("/api/orders/all", serv.RoleMiddleware(http.HandlerFunc(serv.GetAllOrders), "admin"))
+	http.HandleFunc("/api/users/all", serv.GetAllUsersHandler)
+	http.HandleFunc("/api/workers/salary", serv.GetWorkersSalaryHandler)
+	http.HandleFunc("/api/orders/admin", serv.GetAllOrdersAdminStatusHandler)
+	http.HandleFunc("/api/status/change", serv.DeactivateHandler)
+	http.HandleFunc("/api/account/new", serv.CreateNewUserHandler)
+
+	// client
+	http.HandleFunc("/api/order/create", serv.CreateOrderHandler)
+	http.HandleFunc("/api/suggestions", serv.ShowSuggestionByOrderHandler)
+	http.HandleFunc("/api/orders", serv.ShowByStatusOrdersHandler)
+	http.HandleFunc("/api/order", serv.CancelOrderHandler)
+	http.HandleFunc("/api/suggest/pick", serv.AssignWorkerToOrder)
+	http.HandleFunc("/api/workers", serv.GetAllWorkersHandler)
+	http.HandleFunc("/api/work/types", serv.GetAllTypesHandler)
+	http.HandleFunc("/api/order/approve", serv.ApproveWorkHandler)
+	http.HandleFunc("/api/order/new", serv.CreateOrderHandler)
+
+	// http.Handle("/api/orders/user", serv.RoleMiddleware(http.HandlerFunc(serv.GetUserOrders), "user"))
+
+	// worker
+	http.HandleFunc("/api/worker/orders", serv.GetAllOrdersByStatusWorkerHandler)
+	// http.HandleFunc("/api/")
+	http.HandleFunc("/api/worker/suggestion", serv.GetAllsugavaitHandler)
+	http.HandleFunc("/api/worker/salary/all", serv.AllSalaryHandler)
+	// http.HandleFunc("/api/worker/salary", serv.SalaryByTimeHandler)
+
+	http.ListenAndServe(":8080", nil)
 }
