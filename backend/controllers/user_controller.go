@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	execInsert = `INSERT INTO people(name, role, email, phone, password) values ($1, $2, $3, $4, $5) returning id`
-	queryPass  = `SELECT id, name, email, phone, role, password from people where phone=$1`
+	execInsert = `INSERT INTO people(name, role, email, phone, password, status) values ($1, $2, $3, $4, $5, 'active') returning id`
+	queryPass  = `SELECT id, name, email, phone, role, password from people where email=$1`
 	checkPhone = `SELECT id from people where phone=$1`
 )
 

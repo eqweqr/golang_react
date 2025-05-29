@@ -6,10 +6,10 @@ import (
 	"eqweqr/bdkurach/internals/password"
 	"log"
 	"net/http"
-	"strings"
 )
 
 func (server *Server) GetAllOrders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	page := r.URL.Query().Get("page")
 	ordersInfo, err := controllers.GetOrdersAdminByPage(page, server.DB)
 	if err != nil {
@@ -26,6 +26,7 @@ func (server *Server) GetAllOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (server *Server) GetAllOrdersAdminStatusHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	// id := r.URL.Query().Get("id")
 	status := r.URL.Query().Get("status")
 
@@ -45,6 +46,7 @@ func (server *Server) GetAllOrdersAdminStatusHandler(w http.ResponseWriter, r *h
 }
 
 func (server *Server) GetWorkersSalaryHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	slrys, err := controllers.GetWorkersSalary(server.DB)
 	if err != nil {
 		log.Println(err)
@@ -60,7 +62,9 @@ func (server *Server) GetWorkersSalaryHandler(w http.ResponseWriter, r *http.Req
 }
 
 func (server *Server) DeactivateHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	status := r.URL.Query().Get("status")
+	// id := r.URL.Query().Get("id")
 	id := r.URL.Query().Get("id")
 	err := controllers.DeactivateHandler(id, status, server.DB)
 	if err != nil {
@@ -72,6 +76,7 @@ func (server *Server) DeactivateHandler(w http.ResponseWriter, r *http.Request) 
 
 // получить данные по всем пользователям
 func (server *Server) GetAllUsersHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	users, err := controllers.GetAllUsers(server.DB)
 	if err != nil {
 		log.Println(err)
@@ -87,6 +92,7 @@ func (server *Server) GetAllUsersHandler(w http.ResponseWriter, r *http.Request)
 
 // создать нового пользователя любой роли
 func (server *Server) CreateNewUserHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	if err := r.ParseForm(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -118,18 +124,18 @@ func (server *Server) CreateNewUserHandler(w http.ResponseWriter, r *http.Reques
 	email := tmp.Email
 	role := tmp.Role
 
-	if len(username) < 6 || len(phone) != 11 || len(pass) < 6 || !strings.Contains(email, "@") {
-		log.Println("invalid input format")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	// if len(username) < 6 || len(phone) != 11 || len(pass) < 6 || !strings.Contains(email, "@") {
+	// 	log.Println("invalid input format")
+	// 	w.WriteHeader(http.StatusUnauthorized)
+	// 	return
+	// }
 
-	ok, err := controllers.CheckPhoneExists(phone, server.DB)
-	if ok || err != nil {
-		log.Println("phone number already exists")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	// ok, err := controllers.CheckPhoneExists(phone, server.DB)
+	// if ok || err != nil {
+	// 	log.Println("phone number already exists")
+	// 	w.WriteHeader(http.StatusUnauthorized)
+	// 	return
+	// }
 
 	encrypted_pass, err := password.HashPassword(pass)
 	if err != nil {

@@ -11,8 +11,6 @@ import (
 // создать новый заказ(для прода переделать, чтобы id брался из контекста.)
 func (server *Server) CreateOrderHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 
 	log.Println("new order")
 	// if r.Method != http.MethodPost {
@@ -36,7 +34,9 @@ func (server *Server) CreateOrderHandler(w http.ResponseWriter, r *http.Request)
 		Device  string `json:"deviceType"`
 	}
 
-	id := r.URL.Query().Get("id")
+	id := r.Context().Value("id").(string)
+	// id := r.URL.Query().Get("id")
+	// id := r.URL.Query().Get("id")
 
 	var tmp t
 	err := d.Decode(&tmp)
@@ -48,6 +48,12 @@ func (server *Server) CreateOrderHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// id_c := r.Context().Value("id").(string)
+	if tmp.Worker == "" {
+		tmp.Worker = "Любой"
+	}
+	if tmp.Device == "" {
+		tmp.Device = "Другое"
+	}
 	iid, err := controllers.CreateNewOrder(tmp.Name, tmp.Comment, id, "pending", tmp.Warning, tmp.Device, tmp.Worker, server.DB)
 	if err != nil {
 		log.Println(err)
@@ -70,8 +76,9 @@ func (server *Server) ShowSuggestionByOrderHandler(w http.ResponseWriter, r *htt
 	fmt.Println("we")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	// проверка что заказ принадлежт этому человеку
-	// id := r.Context().Value("id").(string)
-	user_id := r.URL.Query().Get("id")
+	user_id := r.Context().Value("id").(string)
+	// user_id := r.URL.Query().Get("id")
+	// user_id := r.URL.Query().Get("id")
 	// if err := controllers.CheckOrderBelong(order_id, id, server.DB); err != nil {
 	// w.WriteHeader(http.StatusOK)
 	// json.NewEncoder(w).Encode(nil)
@@ -91,10 +98,41 @@ func (server *Server) ShowSuggestionByOrderHandler(w http.ResponseWriter, r *htt
 
 // посмотреть все свои заказы pending
 // 'pending', 'processing', 'done'
-func (server *Server) ShowByStatusOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	//id_c := r.Context().Value("id").(string)
+func (server *Server) AgreeOrderHandler(w http.ResponseWriter, r *http.Request) {
+	// id := r.Context().Value("id").(string)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// id := r.URL.Query().Get("id")
 	id := r.URL.Query().Get("id")
+	err := controllers.MakeDone(id, server.DB)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+}
+
+func (server *Server) ShowByStatusOrdersIndiHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.Context().Value("id").(string)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// id := r.URL.Query().Get("id")
+	// id := r.URL.Query().Get("id")
+	status := r.URL.Query().Get("status")
+	// log.Println(id, status)
+	orders, err := controllers.GetAllStatusConfirm(id, status, server.DB)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(orders)
+}
+
+func (server *Server) ShowByStatusOrdersHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.Context().Value("id").(string)
+	// id := r.URL.Query().Get("id")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// id := r.URL.Query().Get("id")
 	status := r.URL.Query().Get("status")
 	log.Println(id, status)
 	orders, err := controllers.GetAllStatusOrders(id, status, server.DB)
@@ -112,7 +150,7 @@ func (server *Server) CancelOrderHandler(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	// id := r.Context().Value("id").(string)
 	user_id := r.URL.Query().Get("user")
-
+	// user_id := r.Context().Value("id").(string)
 	order_id := r.URL.Query().Get("id")
 	err := controllers.CheckOrderBelong(order_id, user_id, server.DB)
 	if err != nil {
@@ -134,7 +172,8 @@ func (server *Server) AssignWorkerToOrder(w http.ResponseWriter, r *http.Request
 	log.Println("re")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	sug_id := r.URL.Query().Get("id")
-	user_id := r.URL.Query().Get("user")
+	user_id := r.Context().Value("id").(string)
+	// user_id := r.URL.Query().Get("user")
 	err := controllers.SuggestionOrder(sug_id, user_id, server.DB)
 	if err != nil {
 		log.Println(err)

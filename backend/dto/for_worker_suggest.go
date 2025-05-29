@@ -1,6 +1,6 @@
 package dto
 
-type FullOrderDTO struct {
+type FullSuggestionDTO struct {
 	OrderId     int
 	ModelName   string
 	Warranty    bool
@@ -10,11 +10,12 @@ type FullOrderDTO struct {
 	ClientPhone string
 	ClientEmail string
 	WorkType    string
+	Proposed    bool
 	WorkerName  interface{}
 	WorkerPhone interface{}
 	WorkerEmail interface{}
 	Summary     interface{}
+	Term        interface{}
 	ConfTime    interface{}
 	CreatedAt   interface{}
-	Term        interface{}
 }

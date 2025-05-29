@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"eqweqr/bdkurach/controllers"
 	"eqweqr/bdkurach/internals/jwttoken"
 	"log"
 	"net/http"
@@ -22,10 +23,18 @@ func (server *Server) RoleMiddleware(next http.Handler, needRole string) http.Ha
 
 		role := jwttoken.GetRoles(token)
 		id := jwttoken.GetId(token)
+		log.Println(id, role)
 
 		if (role == "worker" || role == "client") && role != needRole {
 			log.Println("different role")
 			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if err := controllers.CheckIsActive(id, server.DB); err != nil {
+			log.Println(err)
+			log.Println("AccountIsDiactive")
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 

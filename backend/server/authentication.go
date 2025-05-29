@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
+	"strconv"
 )
 
 const (
@@ -74,42 +74,51 @@ func (server *Server) Register(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+	type t struct {
+		Name  string `json:"username"`
+		Pass  string `json:"password"`
+		Phone string `json:"phone"`
+		Email string `json:"email"`
+	}
+
+	var tmp t
+	err := d.Decode(&tmp)
+	log.Println(&tmp)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	username := r.FormValue("username")
-	pass := r.FormValue("password")
-	phone := r.FormValue("phone")
-	email := r.FormValue("email")
+	// if len(tmp.Name) < 6 || len(tmp.Phone) != 11 || len(tmp.Pass) < 6 || !strings.Contains(tmp.Email, "@") {
+	// log.Println("invalid input format")
+	// w.WriteHeader(http.StatusUnauthorized)
+	// return
+	// }
 
-	if len(username) < 6 || len(phone) != 11 || len(pass) < 6 || !strings.Contains(email, "@") {
-		log.Println("invalid input format")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	// ok, err := controllers.CheckPhoneExists(tmp.Phone, server.DB)
+	// if ok || err != nil {
+	// 	log.Println("phone number already exists")
+	// 	w.WriteHeader(http.StatusUnauthorized)
+	// 	return
+	// }
 
-	ok, err := controllers.CheckPhoneExists(phone, server.DB)
-	if ok || err != nil {
-		log.Println("phone number already exists")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	encrypted_pass, err := password.HashPassword(pass)
+	encrypted_pass, err := password.HashPassword(tmp.Pass)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	id, err := controllers.AddNewUser(username, phone, email, encrypted_pass, server.Secret, server.DB)
+	id, err := controllers.AddNewUser(tmp.Name, tmp.Phone, tmp.Email, encrypted_pass, server.Secret, server.DB)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	token, err := jwttoken.CreateToken(server.Secret, id, username, standart_role)
+	token, err := jwttoken.CreateToken(server.Secret, id, tmp.Name, standart_role)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -125,13 +134,27 @@ func (server *Server) Login(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+	type t struct {
+		Name  string `json:"username"`
+		Pass  string `json:"password"`
+		Phone string `json:"phone"`
+		Email string `json:"email"`
+	}
+
+	var tmp t
+	err := d.Decode(&tmp)
+	log.Println(&tmp)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	phone := r.FormValue("phone")
-	pass := r.FormValue("password")
+	phone := tmp.Email
+	pass := tmp.Pass
 
 	user, err := controllers.GetUserByPhone(phone, server.DB)
 
@@ -151,6 +174,12 @@ func (server *Server) Login(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println("error while creating token")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err = controllers.CheckIsActive(strconv.Itoa(user.ID), server.DB); err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

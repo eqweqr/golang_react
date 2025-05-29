@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	getAllPageOrders  = `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email from orders o join people p on o.client_id=p.id join people on p1 o.worker_id=p1.id limit $1 offset $1*$2`
+	getAllPageOrders  = `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email, o.term from orders o join people p on o.client_id=p.id join people on p1 o.worker_id=p1.id limit $1 offset $1*$2`
 	getAllClientsName = `select id, name from people where role='client' `
 	getAllClientsFull = `select id, name, email, phone from people where role='client'`
 	limit             = 20
@@ -23,7 +23,7 @@ func GetOrdersAdminByPage(page string, db *sql.DB) ([]dto.FullOrderDTO, error) {
 
 	for rows.Next() {
 		var order dto.FullOrderDTO
-		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail)
+		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.Term)
 		if err != nil {
 			return nil, err
 		}
@@ -50,6 +50,16 @@ func GetAllClientFull(db *sql.DB) ([]dto.FullUserDTO, error) {
 		clients = append(clients, client)
 	}
 	return clients, nil
+}
+
+func CheckIsActive(id string, db *sql.DB) error {
+	query := `select 1 from people where id=$1 and status='active'`
+	var v int
+	err := db.QueryRow(query, id).Scan(&v)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // get all workers names
@@ -112,7 +122,7 @@ func CreateNewAccountWithStatus(username string, phone string, email string, pas
 
 // могут не отображаться заказы на которых ен был
 func GetOrders(days string, db *sql.DB) ([]dto.FullOrderDTO, error) {
-	query := `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email , t.name from orders o left join people p on o.client_id=p.id left join people p1 on o.worker_id=p1.id left join typework t on o.work_type=t.id where o.conf_time < now()-interval '$1 days'`
+	query := `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email , t.name, o.term from orders o left join people p on o.client_id=p.id left join people p1 on o.worker_id=p1.id left join typework t on o.work_type=t.id where o.conf_time < now()-interval '$1 days'`
 	// db.Query(query, id, status)
 	var orders []dto.FullOrderDTO
 	rows, err := db.Query(query, days)
@@ -122,7 +132,7 @@ func GetOrders(days string, db *sql.DB) ([]dto.FullOrderDTO, error) {
 
 	for rows.Next() {
 		var order dto.FullOrderDTO
-		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.WorkType)
+		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.WorkType, &order.Term)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +143,7 @@ func GetOrders(days string, db *sql.DB) ([]dto.FullOrderDTO, error) {
 
 // status = pending/ processing/ done
 func GetAllStatusOrdersAdmin(status string, db *sql.DB) ([]dto.FullOrderDTO, error) {
-	query := `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email , t.name from orders o left join people p on o.client_id=p.id left join people p1 on o.worker_id=p1.id left join typework t on o.work_type=t.id where o.order_status=$1`
+	query := `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email , t.name, o.term from orders o left join people p on o.client_id=p.id left join people p1 on o.worker_id=p1.id left join typework t on o.work_type=t.id where o.order_status=$1`
 	// db.Query(query, id, status)
 	var orders []dto.FullOrderDTO
 	rows, err := db.Query(query, status)
@@ -143,7 +153,7 @@ func GetAllStatusOrdersAdmin(status string, db *sql.DB) ([]dto.FullOrderDTO, err
 
 	for rows.Next() {
 		var order dto.FullOrderDTO
-		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.WorkType)
+		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.WorkType, &order.Term)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +165,7 @@ func GetAllStatusOrdersAdmin(status string, db *sql.DB) ([]dto.FullOrderDTO, err
 
 // get worker и выплаты
 func GetWorkersSalary(db *sql.DB) ([]dto.UserSalary, error) {
-	query := `select p.name, p.phone, sum(o.summary) from people p left join orders o on p.id=o.worker_id group by p.id having p.role='worker'`
+	query := `select p.name, p.phone, sum(o.summary), p.email from people p left join orders o on (p.id=o.worker_id and o.order_status='done') group by p.id having p.role='worker'`
 	var tmps []dto.UserSalary
 	rows, err := db.Query(query)
 	if err != nil {
@@ -164,7 +174,7 @@ func GetWorkersSalary(db *sql.DB) ([]dto.UserSalary, error) {
 
 	for rows.Next() {
 		var tmp dto.UserSalary
-		err := rows.Scan(&tmp.Name, &tmp.Phone, &tmp.Summary)
+		err := rows.Scan(&tmp.Name, &tmp.Phone, &tmp.Summary, &tmp.Email)
 		if err != nil {
 			return nil, err
 		}

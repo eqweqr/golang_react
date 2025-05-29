@@ -29,17 +29,18 @@ func CreateNewOrder(model_name, comment, client_id, order_status string, warrant
 	}
 	var dId int
 	log.Println(work_type)
-	err := db.QueryRow(deviceId, worker).Scan(&dId)
+	err := db.QueryRow(workerId, work_type).Scan(&dId)
 	if err != nil {
 		return dto.Ids{}, fmt.Errorf("finding device id: %v", err)
 	}
 
 	if ext {
 		var wId int
-		err = db.QueryRow(workerId, work_type).Scan(&wId)
+		err = db.QueryRow(deviceId, worker).Scan(&wId)
 		if err != nil {
 			return dto.Ids{}, fmt.Errorf("finding worker id: %v", err)
 		}
+		log.Println("device ", dId, "worker", wId)
 		err = db.QueryRow(createNewOrder, model_name, comment, client_id, order_status, warranty, dId, wId).Scan(&tt.Id)
 
 		if err != nil {
@@ -53,17 +54,18 @@ func CreateNewOrder(model_name, comment, client_id, order_status string, warrant
 		}
 		return tt, nil
 	}
+	log.Println(createNewOrder1, model_name, comment, client_id, order_status, warranty, dId)
 	err = db.QueryRow(createNewOrder1, model_name, comment, client_id, order_status, warranty, dId).Scan(&tt.Id)
 
 	if err != nil {
 		return dto.Ids{}, fmt.Errorf("creating new order: %v", err)
 	}
 
-	err = db.QueryRow(`select phone from people where name=$1`, worker).Scan(&tt.Phone)
+	// err = db.QueryRow(`select phone from people where name=$1`, worker).Scan(&tt.Phone)
 
-	if err != nil {
-		return dto.Ids{}, fmt.Errorf("creating new order: %v", err)
-	}
+	// if err != nil {
+	// 	return dto.Ids{}, fmt.Errorf("creating new order: %v", err)
+	// }
 
 	return tt, nil
 }
@@ -213,7 +215,7 @@ type partSug struct {
 // назначить работнику заказ
 func AssignWorkerToOrder(sugId string, db *sql.DB) error {
 	execUpdate := `update orders set worker_id=$1, summary=$2, term=$3, conf_time=now(), order_status='processing' where id=$4`
-	getValFromSug := `select id, order_id, worker_id, summary from suggestions where id=$1`
+	getValFromSug := `select order_id, worker_id, summary, term from suggestions where id=$1`
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -222,11 +224,14 @@ func AssignWorkerToOrder(sugId string, db *sql.DB) error {
 	defer tx.Rollback()
 
 	var suggest partSug
+	log.Println(sugId)
 	err = tx.QueryRow(getValFromSug, sugId).Scan(&suggest.OrderId, &suggest.WorkerId, &suggest.Summary, &suggest.Term)
 	if err != nil {
-		return fmt.Errorf("Error while getting suggestion on id : %v", err)
+		return nil
+		// return fmt.Errorf("Error while getting suggestion on id : %v", err)
 	}
 
+	log.Println(suggest.OrderId)
 	_, err = tx.Exec(execUpdate, suggest.WorkerId, suggest.Summary, suggest.Term, suggest.OrderId)
 	if err != nil {
 		return fmt.Errorf("Error while changing order : %v", err)
@@ -236,7 +241,7 @@ func AssignWorkerToOrder(sugId string, db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("Error while deleting all related suggestions : %v", err)
 	}
-
+	log.Println("reach end")
 	return tx.Commit()
 }
 
@@ -253,7 +258,7 @@ func SuggestionOrder(sug_id, user_id string, db *sql.DB) error {
 
 // status = pending/ processing/ done
 func GetAllStatusOrders(id, status string, db *sql.DB) ([]dto.FullOrderDTO, error) {
-	query := `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email , t.name from orders o left join people p on o.client_id=p.id left join people p1 on o.worker_id=p1.id left join typework t on o.work_type=t.id where o.client_id=$1 and o.order_status=$2 `
+	query := `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email , t.name, o.term from orders o left join people p on o.client_id=p.id left join people p1 on o.worker_id=p1.id left join typework t on o.work_type=t.id where o.client_id=$1 and o.order_status=$2 `
 	// db.Query(query, id, status)
 	var orders []dto.FullOrderDTO
 	rows, err := db.Query(query, id, status)
@@ -263,10 +268,33 @@ func GetAllStatusOrders(id, status string, db *sql.DB) ([]dto.FullOrderDTO, erro
 
 	for rows.Next() {
 		var order dto.FullOrderDTO
-		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.WorkType)
+		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.WorkType, &order.Term)
 		if err != nil {
 			return nil, err
 		}
+		orders = append(orders, order)
+	}
+	return orders, nil
+
+}
+
+func GetAllStatusConfirm(id, status string, db *sql.DB) ([]dto.FullOrderDTO, error) {
+	query := `select o.id, o.created_at, o.model_name, o.warranty, o.comment, o.order_status, o.conf_time, o.summary, p.name, p.phone, p.email, p1.name, p1.phone, p1.email , t.name, o.term from orders o join people p on o.client_id=p.id join people p1 on o.worker_id=p1.id join typework t on o.work_type=t.id where o.client_id=$1 and o.order_status=$2`
+	// db.Query(query, id, status)
+	var orders []dto.FullOrderDTO
+	rows, err := db.Query(query, id, status)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var order dto.FullOrderDTO
+		err := rows.Scan(&order.OrderId, &order.CreatedAt, &order.ModelName, &order.Warranty, &order.Comment, &order.OrderStatus, &order.ConfTime, &order.Summary, &order.ClientName, &order.ClientPhone, &order.ClientEmail, &order.WorkerName, &order.WorkerPhone, &order.WorkerEmail, &order.WorkType, &order.Term)
+		// order.ModelName = "ababa"
+		if err != nil {
+			return nil, err
+		}
+		log.Println(order)
 		orders = append(orders, order)
 	}
 	return orders, nil
@@ -300,5 +328,14 @@ func ApproveWork(order_id string, db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("Error occured while updating work status: %v", err)
 	}
+	return nil
+}
+
+func MakeDone(orderid string, db *sql.DB) error {
+	query := `update orders set order_status='done' where id=$1`
+	if _, err := db.Exec(query, orderid); err != nil {
+		return fmt.Errorf("error while making right: %v", err)
+	}
+
 	return nil
 }
